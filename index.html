@@ -27,8 +27,12 @@
         border-bottom: 1px solid #ccc;
         text-align: left;
       }
-      #export, #import, #reminder {
+      #export, #import {
         margin: 10px 5px;
+      }
+      .over-budget {
+        color: red;
+        font-weight: bold;
       }
       @media (max-width: 600px) {
         body {
@@ -54,13 +58,13 @@
         <option value="expense">Expense</option>
         <option value="debt">Debt Payment</option>
       </select>
+      <input id="category" type="text" placeholder="Category (e.g. groceries, rent)" />
       <button onclick="addTransaction()">Add</button>
     </div>
 
     <div>
       <button id="export" onclick="exportData()">Export Backup</button>
       <input type="file" id="import" onchange="importData(event)" />
-      <button id="reminder" onclick="alert('Don\'t forget to export a backup this week! 💾')">Backup Reminder</button>
     </div>
 
     <h2>Transactions</h2>
@@ -71,6 +75,7 @@
           <th>Description</th>
           <th>Amount</th>
           <th>Type</th>
+          <th>Category</th>
           <th>Action</th>
         </tr>
       </thead>
@@ -86,12 +91,22 @@
     <p><strong>Debt Paid:</strong> $<span id="debtPaid">0</span></p>
     <p><strong>Debt Payoff Progress:</strong> <span id="debtProgress">0%</span></p>
     <p><strong>Last Saved:</strong> <span id="lastSaved">N/A</span></p>
-
+    <div id="overBudgetAlerts"></div>
     <canvas id="chart" height="100"></canvas>
 
     <script>
       const transactionKey = 'transactions';
       const originalDebt = 25074.64;
+      const categoryBudgets = {
+        groceries: 600,
+        entertainment: 300,
+        subscriptions: 200,
+        utilities: 350,
+        "auto insurance": 150,
+        internet: 90,
+        mobile: 60,
+        shopping: 400
+      };
 
       function loadTransactions() {
         const data = JSON.parse(localStorage.getItem(transactionKey)) || [];
@@ -109,9 +124,10 @@
         const description = document.getElementById('description').value;
         const amount = parseFloat(document.getElementById('amount').value);
         const type = document.getElementById('type').value;
+        const category = document.getElementById('category').value.toLowerCase() || 'uncategorized';
         if (!date || !description || isNaN(amount)) return;
 
-        const transaction = { date, description, amount, type };
+        const transaction = { date, description, amount, type, category };
         const data = JSON.parse(localStorage.getItem(transactionKey)) || [];
         data.push(transaction);
         saveTransactions(data);
@@ -129,18 +145,25 @@
         const body = document.getElementById('transactionBody');
         body.innerHTML = '';
         data.forEach((t, i) => {
-          const row = `<tr><td>${t.date}</td><td>${t.description}</td><td>$${t.amount.toFixed(2)}</td><td>${t.type}</td><td><button onclick="deleteTransaction(${i})">Delete</button></td></tr>`;
+          const row = `<tr><td>${t.date}</td><td>${t.description}</td><td>$${t.amount.toFixed(2)}</td><td>${t.type}</td><td>${t.category || 'Uncategorized'}</td><td><button onclick="deleteTransaction(${i})">Delete</button></td></tr>`;
           body.innerHTML += row;
         });
       }
 
       function updateSummary(data) {
         let income = 0, expenses = 0, debt = 0;
+        const categoryTotals = Object.create(null);
+
         data.forEach((t) => {
           if (t.type === 'income') income += t.amount;
           else if (t.type === 'expense') expenses += t.amount;
           else if (t.type === 'debt') debt += t.amount;
+
+          if (t.type === 'expense') {
+            categoryTotals[t.category] = (categoryTotals[t.category] || 0) + t.amount;
+          }
         });
+
         const net = income - expenses - debt;
         const remainingDebt = originalDebt - debt;
         const progress = ((debt / originalDebt) * 100).toFixed(1);
@@ -153,17 +176,42 @@
         document.getElementById('debtPaid').textContent = debt.toFixed(2);
         document.getElementById('debtProgress').textContent = `${progress}%`;
 
+        const alertsDiv = document.getElementById('overBudgetAlerts');
+        alertsDiv.innerHTML = '';
+        for (const category in categoryTotals) {
+          const spent = categoryTotals[category];
+          const budget = categoryBudgets[category] || 0;
+          if (budget > 0 && spent > budget) {
+            const alert = document.createElement('p');
+            alert.className = 'over-budget';
+            alert.textContent = `⚠️ Over budget in "${category}" by $${(spent - budget).toFixed(2)}`;
+            alertsDiv.appendChild(alert);
+          }
+        }
+
         const ctx = document.getElementById('chart').getContext('2d');
         if (window.budgetChart) window.budgetChart.destroy();
+
+        const labels = Object.keys(categoryTotals);
+        const spendingData = labels.map(label => categoryTotals[label]);
+        const budgetData = labels.map(label => categoryBudgets[label] || 0);
+
         window.budgetChart = new Chart(ctx, {
           type: 'bar',
           data: {
-            labels: ['Income', 'Expenses', 'Debt'],
-            datasets: [{
-              label: 'Monthly Summary',
-              data: [income, expenses, debt],
-              backgroundColor: ['#4caf50', '#f44336', '#2196f3']
-            }]
+            labels,
+            datasets: [
+              {
+                label: 'Spending',
+                data: spendingData,
+                backgroundColor: '#f44336'
+              },
+              {
+                label: 'Budget Cap',
+                data: budgetData,
+                backgroundColor: '#4caf50'
+              }
+            ]
           },
           options: {
             responsive: true,
