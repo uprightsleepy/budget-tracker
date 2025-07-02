@@ -186,29 +186,6 @@
         if (totals['garbage']) {
           container.innerHTML += `<p style="color:red"><strong>Garbage (Unbudgeted):</strong> $${totals['garbage'].toFixed(2)}</p>`;
         }
-      };
-        data.forEach(t => {
-          totals[t.category] = (totals[t.category] || 0) + t.amount;
-        });
-
-        const container = document.getElementById('budgetProgress');
-        container.innerHTML = '';
-
-        for (const category in budgetTargets) {
-          const spent = totals[category] || 0;
-          const target = budgetTargets[category];
-          const percent = Math.min((spent / target) * 100, 100);
-          const remaining = target - spent;
-          container.innerHTML += `
-            <p><strong>${category.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}:</strong> $${spent.toFixed(2)} / $${target.toFixed(2)} → Remaining: $${remaining.toFixed(2)}</p>
-            <div class="progress-bar">
-              <div class="progress-fill" style="width: ${percent}%">${percent.toFixed(0)}%</div>
-            </div>`;
-        }
-
-        if (totals['garbage']) {
-          container.innerHTML += `<p style="color:red"><strong>Garbage (Unbudgeted):</strong> $${totals['garbage'].toFixed(2)}</p>`;
-        }
       }
 
       function confirmReset() {
