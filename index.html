@@ -59,6 +59,9 @@
         <option value="utilities">Utilities</option>
         <option value="subscriptions">Subscriptions</option>
         <option value="groceries">Groceries</option>
+        <option value="auto_transport">Auto/Transport</option>
+        <option value="dining_drinks">Dining and Drinks</option>
+        <option value="gym">Gym</option>
         <option value="debt">Debt Payment</option>
         <option value="garbage">Garbage</option>
       </select>
@@ -97,7 +100,10 @@
         utilities: 300,
         subscriptions: 200,
         groceries: 600,
-        debt: 1885
+        auto_transport: 350,
+        dining_drinks: 250,
+        gym: 80,
+        debt: 2500
       };
 
       function loadTransactions() {
@@ -156,9 +162,9 @@
           const percent = Math.min((spent / target) * 100, 100);
           const remaining = target - spent;
           container.innerHTML += `
-            <p><strong>${category}:</strong> $${spent.toFixed(2)} / $${target.toFixed(2)} → Remaining: $${remaining.toFixed(2)}</p>
+            <p><strong>${category.replace('_', ' ')}:</strong> $${spent.toFixed(2)} / $${target.toFixed(2)} → Remaining: $${remaining.toFixed(2)}</p>
             <div class="progress-bar">
-              <div class="progress-fill" style="width: ${percent}%;">${percent.toFixed(0)}%</div>
+              <div class="progress-fill" style="width: ${percent}%">${percent.toFixed(0)}%</div>
             </div>`;
         }
 
