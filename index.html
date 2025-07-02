@@ -27,7 +27,7 @@
         border-bottom: 1px solid #ccc;
         text-align: left;
       }
-      #export, #import {
+      #export, #import, #reminder {
         margin: 10px 5px;
       }
       @media (max-width: 600px) {
@@ -60,6 +60,7 @@
     <div>
       <button id="export" onclick="exportData()">Export Backup</button>
       <input type="file" id="import" onchange="importData(event)" />
+      <button id="reminder" onclick="alert('Don\'t forget to export a backup this week! 💾')">Backup Reminder</button>
     </div>
 
     <h2>Transactions</h2>
@@ -70,6 +71,7 @@
           <th>Description</th>
           <th>Amount</th>
           <th>Type</th>
+          <th>Action</th>
         </tr>
       </thead>
       <tbody id="transactionBody"></tbody>
@@ -83,6 +85,7 @@
     <p><strong>Remaining Credit Card Debt:</strong> $<span id="debtRemaining">25074.64</span></p>
     <p><strong>Debt Paid:</strong> $<span id="debtPaid">0</span></p>
     <p><strong>Debt Payoff Progress:</strong> <span id="debtProgress">0%</span></p>
+    <p><strong>Last Saved:</strong> <span id="lastSaved">N/A</span></p>
 
     <canvas id="chart" height="100"></canvas>
 
@@ -98,6 +101,7 @@
 
       function saveTransactions(data) {
         localStorage.setItem(transactionKey, JSON.stringify(data));
+        document.getElementById('lastSaved').textContent = new Date().toLocaleString();
       }
 
       function addTransaction() {
@@ -114,11 +118,18 @@
         loadTransactions();
       }
 
+      function deleteTransaction(index) {
+        const data = JSON.parse(localStorage.getItem(transactionKey)) || [];
+        data.splice(index, 1);
+        saveTransactions(data);
+        loadTransactions();
+      }
+
       function renderTransactions(data) {
         const body = document.getElementById('transactionBody');
         body.innerHTML = '';
-        data.forEach((t) => {
-          const row = `<tr><td>${t.date}</td><td>${t.description}</td><td>$${t.amount.toFixed(2)}</td><td>${t.type}</td></tr>`;
+        data.forEach((t, i) => {
+          const row = `<tr><td>${t.date}</td><td>${t.description}</td><td>$${t.amount.toFixed(2)}</td><td>${t.type}</td><td><button onclick="deleteTransaction(${i})">Delete</button></td></tr>`;
           body.innerHTML += row;
         });
       }
