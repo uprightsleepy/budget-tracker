@@ -55,16 +55,18 @@
       <input id="description" type="text" placeholder="Description" />
       <input id="amount" type="number" placeholder="Amount" />
       <select id="category">
-        <option value="mortgage">Mortgage</option>
-        <option value="utilities">Utilities</option>
-        <option value="subscriptions">Subscriptions</option>
-        <option value="groceries">Groceries</option>
-        <option value="auto_transport">Auto/Transport</option>
-        <option value="dining_drinks">Dining and Drinks</option>
-        <option value="gym">Gym</option>
-        <option value="debt">Debt Payment</option>
-        <option value="garbage">Garbage</option>
-      </select>
+  <option value="income">Income</option>
+  <option value="transfer">Transfer</option>
+  <option value="mortgage">Mortgage</option>
+  <option value="utilities">Utilities</option>
+  <option value="subscriptions">Subscriptions</option>
+  <option value="groceries">Groceries</option>
+  <option value="auto_transport">Auto/Transport</option>
+  <option value="dining_drinks">Dining and Drinks</option>
+  <option value="gym">Gym</option>
+  <option value="debt">Debt Payment</option>
+  <option value="garbage">Garbage</option>
+</select>
       <button onclick="addTransaction()">Add</button>
     </div>
 
@@ -88,6 +90,8 @@
       <tbody id="transactionBody"></tbody>
     </table>
 
+    <h2>Monthly Overview</h2>
+    <div id="incomeExpenseSummary" style="background:#fff;padding:10px 15px;border-radius:8px;margin-bottom:20px;border:1px solid #ccc;"></div>
     <h2>Budget Progress</h2>
     <div id="budgetProgress"></div>
 
@@ -149,6 +153,40 @@
 
       function updateBudgetProgress(data) {
         const totals = {};
+        let incomeTotal = 0;
+        let expenseTotal = 0;
+
+        data.forEach(t => {
+          totals[t.category] = (totals[t.category] || 0) + t.amount;
+          if (t.category === 'income') {
+            incomeTotal += t.amount;
+          } else if (t.category !== 'transfer') {
+            expenseTotal += t.amount;
+          }
+        });
+
+        const summary = document.getElementById('incomeExpenseSummary');
+        summary.innerHTML = `<strong>Total Income:</strong> $${incomeTotal.toFixed(2)} &nbsp;&nbsp; <strong>Total Expenses:</strong> $${expenseTotal.toFixed(2)} &nbsp;&nbsp; <strong>Net:</strong> $${(incomeTotal - expenseTotal).toFixed(2)}`;
+
+        const container = document.getElementById('budgetProgress');
+        container.innerHTML = '';
+
+        for (const category in budgetTargets) {
+          const spent = totals[category] || 0;
+          const target = budgetTargets[category];
+          const percent = Math.min((spent / target) * 100, 100);
+          const remaining = target - spent;
+          container.innerHTML += `
+            <p><strong>${category.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}:</strong> $${spent.toFixed(2)} / $${target.toFixed(2)} → Remaining: $${remaining.toFixed(2)}</p>
+            <div class="progress-bar">
+              <div class="progress-fill" style="width: ${percent}%">${percent.toFixed(0)}%</div>
+            </div>`;
+        }
+
+        if (totals['garbage']) {
+          container.innerHTML += `<p style="color:red"><strong>Garbage (Unbudgeted):</strong> $${totals['garbage'].toFixed(2)}</p>`;
+        }
+      };
         data.forEach(t => {
           totals[t.category] = (totals[t.category] || 0) + t.amount;
         });
