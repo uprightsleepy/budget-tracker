@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Henry's Budget & Debt Tracker</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+      body {
+        font-family: sans-serif;
+        background: #f4f4f4;
+        padding: 20px;
+        max-width: 800px;
+        margin: auto;
+      }
+      input, select, button {
+        margin: 5px;
+        padding: 5px;
+      }
+      table {
+        width: 100%;
+        margin-top: 10px;
+        border-collapse: collapse;
+      }
+      th, td {
+        padding: 8px;
+        border-bottom: 1px solid #ccc;
+        text-align: left;
+      }
+      #export, #import {
+        margin: 10px 5px;
+      }
+      @media (max-width: 600px) {
+        body {
+          padding: 10px;
+        }
+        table, thead, tbody, th, td, tr {
+          display: block;
+        }
+        th {
+          background: #ccc;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Henry's Budget & Debt Tracker</h1>
+    <div>
+      <input id="date" type="date" />
+      <input id="description" type="text" placeholder="Description" />
+      <input id="amount" type="number" placeholder="Amount" />
+      <select id="type">
+        <option value="income">Income</option>
+        <option value="expense">Expense</option>
+        <option value="debt">Debt Payment</option>
+      </select>
+      <button onclick="addTransaction()">Add</button>
+    </div>
+
+    <div>
+      <button id="export" onclick="exportData()">Export Backup</button>
+      <input type="file" id="import" onchange="importData(event)" />
+    </div>
+
+    <h2>Transactions</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Description</th>
+          <th>Amount</th>
+          <th>Type</th>
+        </tr>
+      </thead>
+      <tbody id="transactionBody"></tbody>
+    </table>
+
+    <h2>Summary</h2>
+    <p><strong>Total Income:</strong> $<span id="totalIncome">0</span></p>
+    <p><strong>Total Expenses:</strong> $<span id="totalExpenses">0</span></p>
+    <p><strong>Total Debt Payments:</strong> $<span id="totalDebt">0</span></p>
+    <p><strong>Net Balance:</strong> $<span id="netBalance">0</span></p>
+    <p><strong>Remaining Credit Card Debt:</strong> $<span id="debtRemaining">25074.64</span></p>
+    <p><strong>Debt Paid:</strong> $<span id="debtPaid">0</span></p>
+    <p><strong>Debt Payoff Progress:</strong> <span id="debtProgress">0%</span></p>
+
+    <canvas id="chart" height="100"></canvas>
+
+    <script>
+      const transactionKey = 'transactions';
+      const originalDebt = 25074.64;
+
+      function loadTransactions() {
+        const data = JSON.parse(localStorage.getItem(transactionKey)) || [];
+        renderTransactions(data);
+        updateSummary(data);
+      }
+
+      function saveTransactions(data) {
+        localStorage.setItem(transactionKey, JSON.stringify(data));
+      }
+
+      function addTransaction() {
+        const date = document.getElementById('date').value;
+        const description = document.getElementById('description').value;
+        const amount = parseFloat(document.getElementById('amount').value);
+        const type = document.getElementById('type').value;
+        if (!date || !description || isNaN(amount)) return;
+
+        const transaction = { date, description, amount, type };
+        const data = JSON.parse(localStorage.getItem(transactionKey)) || [];
+        data.push(transaction);
+        saveTransactions(data);
+        loadTransactions();
+      }
+
+      function renderTransactions(data) {
+        const body = document.getElementById('transactionBody');
+        body.innerHTML = '';
+        data.forEach((t) => {
+          const row = `<tr><td>${t.date}</td><td>${t.description}</td><td>$${t.amount.toFixed(2)}</td><td>${t.type}</td></tr>`;
+          body.innerHTML += row;
+        });
+      }
+
+      function updateSummary(data) {
+        let income = 0, expenses = 0, debt = 0;
+        data.forEach((t) => {
+          if (t.type === 'income') income += t.amount;
+          else if (t.type === 'expense') expenses += t.amount;
+          else if (t.type === 'debt') debt += t.amount;
+        });
+        const net = income - expenses - debt;
+        const remainingDebt = originalDebt - debt;
+        const progress = ((debt / originalDebt) * 100).toFixed(1);
+
+        document.getElementById('totalIncome').textContent = income.toFixed(2);
+        document.getElementById('totalExpenses').textContent = expenses.toFixed(2);
+        document.getElementById('totalDebt').textContent = debt.toFixed(2);
+        document.getElementById('netBalance').textContent = net.toFixed(2);
+        document.getElementById('debtRemaining').textContent = remainingDebt.toFixed(2);
+        document.getElementById('debtPaid').textContent = debt.toFixed(2);
+        document.getElementById('debtProgress').textContent = `${progress}%`;
+
+        const ctx = document.getElementById('chart').getContext('2d');
+        if (window.budgetChart) window.budgetChart.destroy();
+        window.budgetChart = new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels: ['Income', 'Expenses', 'Debt'],
+            datasets: [{
+              label: 'Monthly Summary',
+              data: [income, expenses, debt],
+              backgroundColor: ['#4caf50', '#f44336', '#2196f3']
+            }]
+          },
+          options: {
+            responsive: true,
+            scales: { y: { beginAtZero: true } }
+          }
+        });
+      }
+
+      function exportData() {
+        const data = localStorage.getItem(transactionKey);
+        const blob = new Blob([data], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'budget_backup.json';
+        a.click();
+      }
+
+      function importData(event) {
+        const file = event.target.files[0];
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          const data = JSON.parse(e.target.result);
+          saveTransactions(data);
+          loadTransactions();
+        };
+        reader.readAsText(file);
+      }
+
+      loadTransactions();
+    </script>
+  </body>
+</html>
