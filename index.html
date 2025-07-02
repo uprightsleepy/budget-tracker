@@ -27,23 +27,24 @@
         border-bottom: 1px solid #ccc;
         text-align: left;
       }
-      #export, #import {
+      #export, #import, #reset {
         margin: 10px 5px;
       }
-      .over-budget {
-        color: red;
-        font-weight: bold;
+      .progress-bar {
+        height: 20px;
+        background-color: #ddd;
+        border-radius: 10px;
+        overflow: hidden;
+        margin-top: 5px;
+        margin-bottom: 10px;
       }
-      @media (max-width: 600px) {
-        body {
-          padding: 10px;
-        }
-        table, thead, tbody, th, td, tr {
-          display: block;
-        }
-        th {
-          background: #ccc;
-        }
+      .progress-fill {
+        height: 100%;
+        background-color: #4caf50;
+        text-align: right;
+        color: white;
+        padding-right: 5px;
+        border-radius: 10px 0 0 10px;
       }
     </style>
   </head>
@@ -53,18 +54,21 @@
       <input id="date" type="date" />
       <input id="description" type="text" placeholder="Description" />
       <input id="amount" type="number" placeholder="Amount" />
-      <select id="type">
-        <option value="income">Income</option>
-        <option value="expense">Expense</option>
+      <select id="category">
+        <option value="mortgage">Mortgage</option>
+        <option value="utilities">Utilities</option>
+        <option value="subscriptions">Subscriptions</option>
+        <option value="groceries">Groceries</option>
         <option value="debt">Debt Payment</option>
+        <option value="garbage">Garbage</option>
       </select>
-      <input id="category" type="text" placeholder="Category (e.g. groceries, rent)" />
       <button onclick="addTransaction()">Add</button>
     </div>
 
     <div>
       <button id="export" onclick="exportData()">Export Backup</button>
       <input type="file" id="import" onchange="importData(event)" />
+      <button id="reset" onclick="confirmReset()">Reset Monthly Data</button>
     </div>
 
     <h2>Transactions</h2>
@@ -74,7 +78,6 @@
           <th>Date</th>
           <th>Description</th>
           <th>Amount</th>
-          <th>Type</th>
           <th>Category</th>
           <th>Action</th>
         </tr>
@@ -82,36 +85,25 @@
       <tbody id="transactionBody"></tbody>
     </table>
 
-    <h2>Summary</h2>
-    <p><strong>Total Income:</strong> $<span id="totalIncome">0</span></p>
-    <p><strong>Total Expenses:</strong> $<span id="totalExpenses">0</span></p>
-    <p><strong>Total Debt Payments:</strong> $<span id="totalDebt">0</span></p>
-    <p><strong>Net Balance:</strong> $<span id="netBalance">0</span></p>
-    <p><strong>Remaining Credit Card Debt:</strong> $<span id="debtRemaining">25074.64</span></p>
-    <p><strong>Debt Paid:</strong> $<span id="debtPaid">0</span></p>
-    <p><strong>Debt Payoff Progress:</strong> <span id="debtProgress">0%</span></p>
+    <h2>Budget Progress</h2>
+    <div id="budgetProgress"></div>
+
     <p><strong>Last Saved:</strong> <span id="lastSaved">N/A</span></p>
-    <div id="overBudgetAlerts"></div>
-    <canvas id="chart" height="100"></canvas>
 
     <script>
       const transactionKey = 'transactions';
-      const originalDebt = 25074.64;
-      const categoryBudgets = {
-        groceries: 600,
-        entertainment: 300,
+      const budgetTargets = {
+        mortgage: 2332.92,
+        utilities: 300,
         subscriptions: 200,
-        utilities: 350,
-        "auto insurance": 150,
-        internet: 90,
-        mobile: 60,
-        shopping: 400
+        groceries: 600,
+        debt: 1885
       };
 
       function loadTransactions() {
         const data = JSON.parse(localStorage.getItem(transactionKey)) || [];
         renderTransactions(data);
-        updateSummary(data);
+        updateBudgetProgress(data);
       }
 
       function saveTransactions(data) {
@@ -123,11 +115,10 @@
         const date = document.getElementById('date').value;
         const description = document.getElementById('description').value;
         const amount = parseFloat(document.getElementById('amount').value);
-        const type = document.getElementById('type').value;
-        const category = document.getElementById('category').value.toLowerCase() || 'uncategorized';
+        const category = document.getElementById('category').value;
         if (!date || !description || isNaN(amount)) return;
 
-        const transaction = { date, description, amount, type, category };
+        const transaction = { date, description, amount, category };
         const data = JSON.parse(localStorage.getItem(transactionKey)) || [];
         data.push(transaction);
         saveTransactions(data);
@@ -145,79 +136,43 @@
         const body = document.getElementById('transactionBody');
         body.innerHTML = '';
         data.forEach((t, i) => {
-          const row = `<tr><td>${t.date}</td><td>${t.description}</td><td>$${t.amount.toFixed(2)}</td><td>${t.type}</td><td>${t.category || 'Uncategorized'}</td><td><button onclick="deleteTransaction(${i})">Delete</button></td></tr>`;
+          const row = `<tr><td>${t.date}</td><td>${t.description}</td><td>$${t.amount.toFixed(2)}</td><td>${t.category}</td><td><button onclick="deleteTransaction(${i})">Delete</button></td></tr>`;
           body.innerHTML += row;
         });
       }
 
-      function updateSummary(data) {
-        let income = 0, expenses = 0, debt = 0;
-        const categoryTotals = Object.create(null);
-
-        data.forEach((t) => {
-          if (t.type === 'income') income += t.amount;
-          else if (t.type === 'expense') expenses += t.amount;
-          else if (t.type === 'debt') debt += t.amount;
-
-          if (t.type === 'expense') {
-            categoryTotals[t.category] = (categoryTotals[t.category] || 0) + t.amount;
-          }
+      function updateBudgetProgress(data) {
+        const totals = {};
+        data.forEach(t => {
+          totals[t.category] = (totals[t.category] || 0) + t.amount;
         });
 
-        const net = income - expenses - debt;
-        const remainingDebt = originalDebt - debt;
-        const progress = ((debt / originalDebt) * 100).toFixed(1);
+        const container = document.getElementById('budgetProgress');
+        container.innerHTML = '';
 
-        document.getElementById('totalIncome').textContent = income.toFixed(2);
-        document.getElementById('totalExpenses').textContent = expenses.toFixed(2);
-        document.getElementById('totalDebt').textContent = debt.toFixed(2);
-        document.getElementById('netBalance').textContent = net.toFixed(2);
-        document.getElementById('debtRemaining').textContent = remainingDebt.toFixed(2);
-        document.getElementById('debtPaid').textContent = debt.toFixed(2);
-        document.getElementById('debtProgress').textContent = `${progress}%`;
-
-        const alertsDiv = document.getElementById('overBudgetAlerts');
-        alertsDiv.innerHTML = '';
-        for (const category in categoryTotals) {
-          const spent = categoryTotals[category];
-          const budget = categoryBudgets[category] || 0;
-          if (budget > 0 && spent > budget) {
-            const alert = document.createElement('p');
-            alert.className = 'over-budget';
-            alert.textContent = `⚠️ Over budget in "${category}" by $${(spent - budget).toFixed(2)}`;
-            alertsDiv.appendChild(alert);
-          }
+        for (const category in budgetTargets) {
+          const spent = totals[category] || 0;
+          const target = budgetTargets[category];
+          const percent = Math.min((spent / target) * 100, 100);
+          const remaining = target - spent;
+          container.innerHTML += `
+            <p><strong>${category}:</strong> $${spent.toFixed(2)} / $${target.toFixed(2)} → Remaining: $${remaining.toFixed(2)}</p>
+            <div class="progress-bar">
+              <div class="progress-fill" style="width: ${percent}%;">${percent.toFixed(0)}%</div>
+            </div>`;
         }
 
-        const ctx = document.getElementById('chart').getContext('2d');
-        if (window.budgetChart) window.budgetChart.destroy();
+        if (totals['garbage']) {
+          container.innerHTML += `<p style="color:red"><strong>Garbage (Unbudgeted):</strong> $${totals['garbage'].toFixed(2)}</p>`;
+        }
+      }
 
-        const labels = Object.keys(categoryTotals);
-        const spendingData = labels.map(label => categoryTotals[label]);
-        const budgetData = labels.map(label => categoryBudgets[label] || 0);
-
-        window.budgetChart = new Chart(ctx, {
-          type: 'bar',
-          data: {
-            labels,
-            datasets: [
-              {
-                label: 'Spending',
-                data: spendingData,
-                backgroundColor: '#f44336'
-              },
-              {
-                label: 'Budget Cap',
-                data: budgetData,
-                backgroundColor: '#4caf50'
-              }
-            ]
-          },
-          options: {
-            responsive: true,
-            scales: { y: { beginAtZero: true } }
-          }
-        });
+      function confirmReset() {
+        const confirmClear = confirm("Are you sure you want to reset all transactions for the new month? This cannot be undone.");
+        if (confirmClear) {
+          localStorage.removeItem(transactionKey);
+          loadTransactions();
+        }
       }
 
       function exportData() {
