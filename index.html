@@ -99,10 +99,10 @@
         mortgage: 2332.92,
         utilities: 300,
         subscriptions: 200,
-        groceries: 600,
-        auto_transport: 350,
+        groceries: 500,
+        auto_transport: 200,
         dining_drinks: 250,
-        gym: 80,
+        gym: 135,
         debt: 2500
       };
 
@@ -162,7 +162,7 @@
           const percent = Math.min((spent / target) * 100, 100);
           const remaining = target - spent;
           container.innerHTML += `
-            <p><strong>${category.replace('_', ' ')}:</strong> $${spent.toFixed(2)} / $${target.toFixed(2)} → Remaining: $${remaining.toFixed(2)}</p>
+            <p><strong>${category.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}:</strong> $${spent.toFixed(2)} / $${target.toFixed(2)} → Remaining: $${remaining.toFixed(2)}</p>
             <div class="progress-bar">
               <div class="progress-fill" style="width: ${percent}%">${percent.toFixed(0)}%</div>
             </div>`;
